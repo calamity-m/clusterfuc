@@ -44,7 +44,7 @@ func (a *Agent[Out]) RegisterTool(name string, tool executableTool) error {
 	return nil
 }
 
-func (a *Agent[Out]) Call(ctx context.Context, input string) (string, error) {
+func (a *Agent[Out]) Call(ctx context.Context, input []string) (string, error) {
 
 	// Haha switch statement go brrrr
 	// there is definitely a 100% better way to do this

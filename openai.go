@@ -6,10 +6,10 @@ import (
 	"log/slog"
 )
 
-func (a *Agent[Out]) callOpenAIModel(ctx context.Context, input string) (string, error) {
+func (a *Agent[Out]) callOpenAIModel(ctx context.Context, input []string) (string, error) {
 	slog.DebugContext(ctx, "calling openai model", slog.String("model", a.model))
 	if a.verbose {
-		slog.DebugContext(ctx, "input", slog.String("input", input))
+		slog.DebugContext(ctx, "input", slog.Any("input", input))
 	}
 
 	return "", errors.ErrUnsupported
