@@ -42,8 +42,9 @@ type toolDef struct {
 // Instead, it is recommended that either the AgentToolFunc wrapper or WithTool option
 // are utilised to register tools with the agent.
 type executableTool struct {
-	Executable executable
-	Definition toolDef
+	Executable  executable
+	Definition  toolDef
+	Description string
 }
 
 // A tool itself is some function with a predetermined input and output that matches roughly,
@@ -54,7 +55,7 @@ type executableTool struct {
 // Output will be marshalled to JSON and provided back to the calling agent. It is assumed
 // that the input type is considered to represent the tool's "schema" and will be geneerated
 // at runtime.
-func Tool[In any, Out any](f tool[In, Out]) executableTool {
+func Tool[In any, Out any](f tool[In, Out], description string) executableTool {
 
 	reflector := jsonschema.Reflector{
 		AllowAdditionalProperties: false,
@@ -95,7 +96,7 @@ func Tool[In any, Out any](f tool[In, Out]) executableTool {
 
 // Follows the same pattern as Tool but allows the user to specify a definition as a json
 // encoded string that matches the internal toolDef struct.
-func ToolDef[In any, Out any](f tool[In, Out], definition string) (executableTool, error) {
+func ToolDef[In any, Out any](f tool[In, Out], definition string, description string) (executableTool, error) {
 
 	var def toolDef
 

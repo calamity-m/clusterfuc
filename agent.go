@@ -103,9 +103,9 @@ func WithHTTPClient[Out any](client *http.Client) OptsAgent[Out] {
 }
 
 // Apply a function as a "tool" to the agent
-func WithTool[In any, Out any, AgentOut any](toolName string, tool tool[In, Out]) OptsAgent[AgentOut] {
+func WithTool[In any, Out any, AgentOut any](toolName string, toolDesc string, tool tool[In, Out]) OptsAgent[AgentOut] {
 	return func(a *Agent[AgentOut]) error {
-		err := a.RegisterTool(toolName, Tool(tool))
+		err := a.RegisterTool(toolName, Tool(tool, toolDesc))
 		if err != nil {
 			return err
 		}
@@ -117,7 +117,7 @@ func WithTool[In any, Out any, AgentOut any](toolName string, tool tool[In, Out]
 // Shorthand option for adding an agent itself as a tool.
 func WithAgentAsTool[In any, Out any, AgentOut any](toolName string, agent Agent[AgentOut]) OptsAgent[AgentOut] {
 	return func(a *Agent[AgentOut]) error {
-		err := a.RegisterTool(toolName, Tool(agent.Call))
+		err := a.RegisterTool(toolName, Tool(agent.Call, "a downstream agent to rely on for more complex tasks"))
 		if err != nil {
 			return err
 		}

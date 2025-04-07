@@ -22,7 +22,7 @@ func TestAgent(t *testing.T) {
 	}
 
 	opts := []OptsAgent[SingleAnswer]{
-		WithTool[Aggs, string, SingleAnswer]("fn", fn),
+		WithTool[Aggs, string, SingleAnswer]("fn", "description", fn),
 	}
 	agent, err := NewAgent(opts...)
 
@@ -30,7 +30,7 @@ func TestAgent(t *testing.T) {
 		t.Fatalf("failed to create agent: %v", err)
 	}
 
-	agent.RegisterTool("fn", Tool(fn))
+	agent.RegisterTool("fn", Tool(fn, "a tool test"))
 
 	builder := strings.Builder{}
 

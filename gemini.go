@@ -21,8 +21,8 @@ func formatRequest(prompt string, input []string, tools map[string]executableToo
 	functionDeclarations := make([]map[string]any, 0, len(tools))
 	for name, tool := range tools {
 		functionDeclarations = append(functionDeclarations, map[string]any{
-			"name": name,
-			// "description": "well shit i didnt think about this",
+			"name":        name,
+			"description": tool.Definition,
 			"parameters": map[string]any{
 				"type":       "object",
 				"properties": tool.Definition.Properties,
