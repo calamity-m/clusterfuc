@@ -24,6 +24,7 @@ type Agent[Out any] struct {
 	prompt     string
 	name       string
 	model      string
+	verbose    bool
 }
 
 func (a *Agent[Out]) ListTools() map[string]executableTool {
@@ -44,7 +45,18 @@ func (a *Agent[Out]) RegisterTool(name string, tool executableTool) error {
 }
 
 func (a *Agent[Out]) Call(ctx context.Context, input string) (string, error) {
-	// ...existing logic for Call...
+
+	// Haha switch statement go brrrr
+	// there is definitely a 100% better way to do this
+	// but i am lazy and this is easy to read
+	switch a.model {
+	case OpenAIChatGPT4o.Model(), OpenAIChatGPT4oMini.Model():
+		return a.callOpenAIModel(ctx, input)
+	case Gemini2Flash.Model(), Gemini2FlashLite.Model():
+		return a.callGeminiModel(ctx, input)
+	}
+
+	// Unmatched model so let's just go away and cry
 	return "", errors.ErrUnsupported
 }
 
@@ -75,10 +87,9 @@ func WithName[Out any](name string) OptsAgent[Out] {
 }
 
 // Set model, tbd how this works in the future
-func WithModel[Out any](model string) OptsAgent[Out] {
-
+func WithModel[Out any, Model OpenAIModel | GeminiModel](model AIModel[Model]) OptsAgent[Out] {
 	return func(a *Agent[Out]) error {
-		a.model = model
+		a.model = model.Model()
 		return nil
 	}
 }
