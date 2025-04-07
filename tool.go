@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"strings"
 
 	"github.com/invopop/jsonschema"
 )
@@ -90,4 +91,42 @@ func Tool[In any, Out any](f tool[In, Out]) executableTool {
 			Properties: schema.Properties,
 			Required:   schema.Required,
 		}}
+}
+
+// Follows the same pattern as Tool but allows the user to specify a definition as a json
+// encoded string that matches the internal toolDef struct.
+func ToolDef[In any, Out any](f tool[In, Out], definition string) (executableTool, error) {
+
+	var def toolDef
+
+	// Retrieve data from request
+	err := json.NewDecoder(strings.NewReader(definition)).Decode(&def)
+	if err != nil {
+		return executableTool{}, err
+	}
+
+	return executableTool{
+		Executable: executableFunc(func(r io.Reader, w io.Writer) error {
+			var in In
+
+			// Retrieve data from request
+			err := json.NewDecoder(r).Decode(&in)
+			if err != nil {
+				return err
+			}
+
+			out, err := f(context.TODO(), in)
+			if err != nil {
+				return err
+			}
+
+			err = json.NewEncoder(w).Encode(out)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		}),
+		Definition: def,
+	}, nil
 }

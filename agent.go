@@ -2,6 +2,8 @@ package clusterfuc
 
 import (
 	"context"
+	"errors"
+	"net/http"
 )
 
 // Basic binding for agent output
@@ -16,19 +18,38 @@ type Flow struct {
 }
 
 // Agent interface providing the same functionality as the original struct
-type Agent[Out any] interface {
-	GetPrompt() string
-	SetPrompt(prompt string)
-	GetName() string
-	SetName(name string)
-	GetModel() string
-	SetModel(model string)
-	Call(ctx context.Context, input string) (string, error)
-	Register(name string, tool executableTool) error
+type Agent[Out any] struct {
+	tools      map[string]executableTool
+	httpClient *http.Client
+	prompt     string
+	name       string
+	model      string
+}
+
+func (a *Agent[Out]) ListTools() map[string]executableTool {
+	return a.tools
+}
+
+func (a *Agent[Out]) RegisterTool(name string, tool executableTool) error {
+	if len(a.tools) > MAX_TOOLS_COUMT {
+		return ErrExceededMaxToolCount
+	}
+
+	if _, ok := a.tools[name]; ok {
+		return ErrToolAlreadyExists
+	}
+
+	a.tools[name] = tool
+	return nil
+}
+
+func (a *Agent[Out]) Call(ctx context.Context, input string) (string, error) {
+	// ...existing logic for Call...
+	return "", errors.ErrUnsupported
 }
 
 // Shorthand function for opts pattern
-type OptsAgent[Out any] func(Agent[Out]) error
+type OptsAgent[Out any] func(*Agent[Out]) error
 
 // Defaults opts most likely to be used
 func DefaultOpts[Out any]() []OptsAgent[Out] {
@@ -39,16 +60,16 @@ func DefaultOpts[Out any]() []OptsAgent[Out] {
 
 // Set prompt
 func WithPrompt[Out any](prompt string) OptsAgent[Out] {
-	return func(a Agent[Out]) error {
-		a.SetPrompt(prompt)
+	return func(a *Agent[Out]) error {
+		a.prompt = prompt
 		return nil
 	}
 }
 
 // Set name
 func WithName[Out any](name string) OptsAgent[Out] {
-	return func(a Agent[Out]) error {
-		a.SetName(name)
+	return func(a *Agent[Out]) error {
+		a.name = name
 		return nil
 	}
 }
@@ -56,16 +77,24 @@ func WithName[Out any](name string) OptsAgent[Out] {
 // Set model, tbd how this works in the future
 func WithModel[Out any](model string) OptsAgent[Out] {
 
-	return func(a Agent[Out]) error {
-		a.SetModel(model)
+	return func(a *Agent[Out]) error {
+		a.model = model
+		return nil
+	}
+}
+
+// Set HTTP client
+func WithHTTPClient[Out any](client *http.Client) OptsAgent[Out] {
+	return func(a *Agent[Out]) error {
+		a.httpClient = client
 		return nil
 	}
 }
 
 // Apply a function as a "tool" to the agent
 func WithTool[In any, Out any, AgentOut any](toolName string, tool tool[In, Out]) OptsAgent[AgentOut] {
-	return func(a Agent[AgentOut]) error {
-		err := a.Register(toolName, Tool(tool))
+	return func(a *Agent[AgentOut]) error {
+		err := a.RegisterTool(toolName, Tool(tool))
 		if err != nil {
 			return err
 		}
@@ -76,12 +105,27 @@ func WithTool[In any, Out any, AgentOut any](toolName string, tool tool[In, Out]
 
 // Shorthand option for adding an agent itself as a tool.
 func WithAgentAsTool[In any, Out any, AgentOut any](toolName string, agent Agent[AgentOut]) OptsAgent[AgentOut] {
-	return func(a Agent[AgentOut]) error {
-		err := a.Register(toolName, Tool(agent.Call))
+	return func(a *Agent[AgentOut]) error {
+		err := a.RegisterTool(toolName, Tool(agent.Call))
 		if err != nil {
 			return err
 		}
 
 		return nil
 	}
+}
+
+// Create a new agent with the given options
+func NewAgent[Out any](opts ...OptsAgent[Out]) (*Agent[Out], error) {
+	opts = append(DefaultOpts[Out](), opts...)
+
+	agent := &Agent[Out]{tools: make(map[string]executableTool)}
+	for _, opt := range opts {
+		err := opt(agent)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return agent, nil
 }

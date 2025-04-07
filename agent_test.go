@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-
-	"github.com/openai/openai-go"
 )
 
 type Aggs struct {
@@ -25,15 +23,14 @@ func TestAgent(t *testing.T) {
 
 	opts := []OptsAgent[SingleAnswer]{
 		WithTool[Aggs, string, SingleAnswer]("fn", fn),
-		WithOpenAIClient[SingleAnswer](&openai.Client{}),
 	}
-	agent, err := NewOpenAIAgent(opts...)
+	agent, err := NewAgent(opts...)
 
 	if err != nil {
 		t.Fatalf("failed to create agent: %v", err)
 	}
 
-	agent.Register("fn", Tool(fn))
+	agent.RegisterTool("fn", Tool(fn))
 
 	builder := strings.Builder{}
 
@@ -44,15 +41,15 @@ func TestAgent(t *testing.T) {
 
 	buffie := bytes.NewBuffer([]byte{})
 
-	err = agent.GetExecutables()["fn"].Executable.Execute(strings.NewReader(builder.String()), buffie)
+	err = agent.ListTools()["fn"].Executable.Execute(strings.NewReader(builder.String()), buffie)
 	if err != nil {
 		t.Fatalf("failed to execute tool: %v", err)
 	}
 
-	fmt.Printf("%#v\n", agent.GetExecutables()["fn"].Definition.Properties)
+	fmt.Printf("%#v\n", agent.ListTools()["fn"].Definition.Properties)
 
 	w := bytes.Buffer{}
-	if err := json.NewEncoder(&w).Encode(agent.GetExecutables()["fn"].Definition.Properties); err != nil {
+	if err := json.NewEncoder(&w).Encode(agent.ListTools()["fn"].Definition.Properties); err != nil {
 
 	}
 
