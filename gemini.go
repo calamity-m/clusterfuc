@@ -16,7 +16,7 @@ func (a *Agent[Out]) callGeminiModel(ctx context.Context, input []string) (strin
 	return "", errors.ErrUnsupported
 }
 
-func FormatRequest(prompt string, input []string, tools map[string]executableTool) (string, error) {
+func formatRequest(prompt string, input []string, tools map[string]executableTool) (string, error) {
 
 	functionDeclarations := make([]map[string]any, 0, len(tools))
 	for name, tool := range tools {
