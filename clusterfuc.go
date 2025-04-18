@@ -19,17 +19,22 @@ const (
 	Gemini2FlashLite model.GeminiAiModel = "gemini-2.0-flash-lite"
 )
 
-type GeminiAgentConfig struct {
+type AgentConfig struct {
 	Client       *http.Client
 	Model        model.GeminiAiModel
 	SystemPrompt string
 	Verbose      bool
 	Auth         string
+	URL          string
 }
 
-func NewGeminiAgent(cfg *GeminiAgentConfig) (*agent.Agent[model.GeminiAiModel], error) {
+func NewGeminiAgent(cfg *AgentConfig) (*agent.Agent[model.GeminiAiModel], error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("nil agent config not allowed - %w", ErrAgentOptInvalid)
+	}
+
+	if cfg.URL == "" {
+		cfg.URL = "https://generativelanguage.googleapis.com/v1beta/models"
 	}
 
 	return &agent.Agent[model.GeminiAiModel]{
@@ -40,6 +45,28 @@ func NewGeminiAgent(cfg *GeminiAgentConfig) (*agent.Agent[model.GeminiAiModel], 
 		SystemPrompt: cfg.SystemPrompt,
 		Verbose:      cfg.Verbose,
 		Auth:         cfg.Auth,
+		URL:          cfg.URL,
+	}, nil
+}
+
+func NewOpenAIAgent(cfg *AgentConfig) (*agent.Agent[model.OpenAiModel], error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("nil agent config not allowed - %w", ErrAgentOptInvalid)
+	}
+
+	if cfg.URL == "" {
+		cfg.URL = "https://api.openai.com/v1/responses"
+	}
+
+	return &agent.Agent[model.OpenAiModel]{
+		Client:       cfg.Client,
+		Functions:    []executable.Executable[any, any]{},
+		Model:        cfg.Model,
+		Memoriser:    &memoriser.NoOpMemoriser{},
+		SystemPrompt: cfg.SystemPrompt,
+		Verbose:      cfg.Verbose,
+		Auth:         cfg.Auth,
+		URL:          cfg.URL,
 	}, nil
 }
 

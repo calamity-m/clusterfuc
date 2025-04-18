@@ -25,6 +25,7 @@ type Agent[T model.AIModel] struct {
 	// Verbose will print user input, which may
 	// be a cause for concern
 	Verbose bool
+	URL     string
 }
 
 type AgentInput struct {
@@ -82,7 +83,7 @@ func (a *Agent[T]) callGeminiSchema(ctx context.Context, id string, userInput st
 	body.Contents = contents
 
 	// Make the request
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", a.Model.Model(), a.Auth)
+	url := fmt.Sprintf("%s/%s:generateContent?key=%s", a.URL, a.Model.Model(), a.Auth)
 	resp, err := gemini.CallGeminiApi(ctx, a.Client, url, body)
 	if err != nil {
 		return "", fmt.Errorf("failed to call gemini api - %w", err)
