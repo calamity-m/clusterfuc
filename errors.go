@@ -1,10 +1,15 @@
 package clusterfuc
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/calamity-m/clusterfuc/internal/agent"
+	"github.com/calamity-m/clusterfuc/internal/gemini"
+)
 
 var (
 	ErrExceededMaxToolCount = errors.New("exceeded max tool count")
-	ErrToolAlreadyExists    = errors.New("invalid args were passed")
-	ErrAgentClientInvalid   = errors.New("invalid client was passed")
 	ErrAgentOptInvalid      = errors.New("invalid agent option was passed")
+	ErrModelUnmatched       = agent.ErrModelUnmatched
+	ErrInvalidGeminiContent = gemini.ErrInvalidGeminiContent
 )

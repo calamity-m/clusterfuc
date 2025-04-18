@@ -14,6 +14,10 @@ import (
 	"github.com/calamity-m/clusterfuc/pkg/memoriser"
 )
 
+var (
+	ErrModelUnmatched = errors.New("model could not be matched")
+)
+
 // T model type, drives what agent this will be
 type Agent[T model.AIModel] struct {
 	Functions    []executable.Executable[any, any]
@@ -43,7 +47,7 @@ func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (string, error) {
 		return a.callOpenAISchema(ctx, input.Id, input.UserInput, input.Schema)
 	}
 
-	return "", errors.New("moddel could not be matched")
+	return "", ErrModelUnmatched
 
 }
 

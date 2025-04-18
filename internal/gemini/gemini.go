@@ -2,6 +2,10 @@ package gemini
 
 import "errors"
 
+var (
+	ErrInvalidGeminiContent = errors.New("input contains non gemini content")
+)
+
 type FunctionCall struct {
 	Name string `json:"name,omitempty"`
 	Args any    `json:"args,omitempty"`
@@ -56,7 +60,7 @@ func VerifyContents(in []any) ([]Content, error) {
 	for ix, val := range in {
 		content, ok := val.(Content)
 		if !ok {
-			return []Content{}, errors.New("input contains non gemini content")
+			return []Content{}, ErrInvalidGeminiContent
 		}
 
 		contents[ix] = content
