@@ -48,6 +48,10 @@ func ExtendAgent[T any, S any](
 	fnName string,
 	fn func(ctx context.Context, in T) (S, error),
 ) (*agent.Agent[model.OpenAiModel], error) {
+	if len(a.Functions) >= model.MAX_TOOLS_COUMT {
+		return a, ErrExceededMaxToolCount
+	}
+
 	a.Functions = append(a.Functions, executable.ExecuteableFunction(fnName, fn))
 	return a, nil
 }
