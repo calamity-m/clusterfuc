@@ -1,10 +1,65 @@
 package clusterfuc
 
-import "testing"
+import (
+	"context"
+	"crypto/rand"
+	"fmt"
+	"net/http"
+	"os"
+	"testing"
+
+	"github.com/calamity-m/clusterfuc/internal/agent"
+	"github.com/calamity-m/clusterfuc/internal/executable"
+	"github.com/calamity-m/clusterfuc/pkg/memoriser"
+)
 
 func TestAgentCreation(t *testing.T) {
 	// TODO creating agents through
 	// the restricted api of clusterfuc.
+
+	t.Run("nil agent config fails", func(t *testing.T) {
+		_, err := NewGeminiAgent(nil)
+		if err == nil {
+			t.Errorf("expected err during openai creation but got nil")
+		}
+
+		_, err = NewOpenAIAgent(nil)
+		if err == nil {
+			t.Errorf("expected err during openai creation but got nil")
+		}
+	})
+
+	t.Run("gemini agent config", func(t *testing.T) {
+		agent, err := NewGeminiAgent(&AgentConfig{})
+		if err != nil {
+			t.Fatalf("did not expect err but got %v", err)
+		}
+
+		if agent.URL == "" {
+			t.Errorf("url is not changed from zero value")
+		}
+
+		_, ok := agent.Memoriser.(*memoriser.NoOpMemoriser)
+		if !ok {
+			t.Errorf("expected NoOpMemoriser but got %#v instead", agent.Memoriser)
+		}
+	})
+
+	t.Run("openai agent config", func(t *testing.T) {
+		agent, err := NewOpenAIAgent(&AgentConfig{})
+		if err != nil {
+			t.Fatalf("did not expect err but got %v", err)
+		}
+
+		if agent.URL == "" {
+			t.Fatalf("url is not changed from zero value")
+		}
+
+		_, ok := agent.Memoriser.(*memoriser.NoOpMemoriser)
+		if !ok {
+			t.Errorf("expected NoOpMemoriser but got %#v instead", agent.Memoriser)
+		}
+	})
 }
 
 func TestExtendAgent(t *testing.T) {
@@ -27,4 +82,44 @@ func TestAgentVerbosity(t *testing.T) {
 	// test due to the nature of this config
 	// option. Displaying user input when
 	// not wanted may be catastrophic.
+}
+
+func TestFreely(t *testing.T) {
+	type Arg struct {
+		Name string `json:"name" jsonschema:"description=this is aname"`
+		Ok   bool   `json:"ok" jsonschema:"description=this is aname"`
+	}
+
+	fn := func(ctx context.Context, in Arg) (Arg, error) {
+		fmt.Printf("yahoooo %s\n", in.Name)
+		in.Name = fmt.Sprintf("%s + %s", in.Name, "TEST EXECUTED")
+		return in, nil
+	}
+
+	a, err := NewGeminiAgent(&AgentConfig{
+		Model:   Gemini2Flash,
+		Verbose: true,
+		Client:  http.DefaultClient,
+		Auth:    os.Getenv("AUTH"),
+	})
+	if err != nil {
+		t.Fatalf("unexpected err - %#v", err)
+	}
+
+	a.Functions = append(a.Functions, executable.ExecuteableFunction("test", fn))
+
+	input := agent.AgentInput{
+		Id: rand.Text(),
+		UserInput: fmt.Sprintf(
+			"req id: %s - input: %s",
+			rand.Text(),
+			"I am testing function calling and flash 2.0's humour. If you don't have a tool to fulfil a request, do your best on your own. Please the test function, and also tell me a random joke.",
+		),
+		Schema: nil,
+	}
+
+	o, err := a.Call(context.TODO(), input)
+
+	fmt.Println(err)
+	fmt.Println(o)
 }
