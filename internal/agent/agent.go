@@ -27,27 +27,23 @@ type Agent[T model.AIModel] struct {
 	Verbose bool
 }
 
-func (a *Agent[T]) Call(ctx context.Context, id string, userInput string) (string, error) {
-
-	out, err := a.CallSchema(ctx, id, userInput, nil)
-	if err != nil {
-		return "", fmt.Errorf("agent call failed - %w", err)
-	}
-
-	return out, nil
-
+type AgentInput struct {
+	Id        string
+	UserInput string
+	Schema    *executable.JSONSchemaSubset
 }
 
-func (a *Agent[T]) CallSchema(ctx context.Context, id string, userInput string, schema *executable.JSONSchemaSubset) (string, error) {
+func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (string, error) {
 	if _, ok := a.Model.(model.GeminiAiModel); ok {
-		return a.callGeminiSchema(ctx, id, userInput, schema)
+		return a.callGeminiSchema(ctx, input.Id, input.UserInput, input.Schema)
 	}
 
 	if _, ok := a.Model.(model.OpenAiModel); ok {
-		return a.callOpenAISchema(ctx, id, userInput, schema)
+		return a.callOpenAISchema(ctx, input.Id, input.UserInput, input.Schema)
 	}
 
 	return "", errors.New("moddel could not be matched")
+
 }
 
 func (a *Agent[T]) callGeminiSchema(ctx context.Context, id string, userInput string, schema *executable.JSONSchemaSubset) (string, error) {
