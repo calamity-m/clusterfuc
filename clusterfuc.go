@@ -21,44 +21,29 @@ const (
 
 type AgentConfig struct {
 	Client       *http.Client
-	Model        model.GeminiAiModel
+	Model        model.AIModel
 	SystemPrompt string
 	Verbose      bool
 	Auth         string
 	URL          string
 }
 
-func NewGeminiAgent(cfg *AgentConfig) (*agent.Agent[model.GeminiAiModel], error) {
+func NewAgent(cfg *AgentConfig) (*agent.Agent[model.AIModel], error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("nil agent config not allowed - %w", ErrAgentOptInvalid)
 	}
 
+	// Set the default URL based on the model we've supplied
 	if cfg.URL == "" {
-		cfg.URL = "https://generativelanguage.googleapis.com/v1beta/models"
+		if _, ok := cfg.Model.(model.GeminiAiModel); ok {
+			cfg.URL = "https://generativelanguage.googleapis.com/v1beta/models"
+		}
+		if _, ok := cfg.Model.(model.OpenAiModel); ok {
+			cfg.URL = "https://api.openai.com/v1/responses"
+		}
 	}
 
-	return &agent.Agent[model.GeminiAiModel]{
-		Client:       cfg.Client,
-		Functions:    []executable.Executable[any, any]{},
-		Model:        cfg.Model,
-		Memoriser:    &memoriser.NoOpMemoriser{},
-		SystemPrompt: cfg.SystemPrompt,
-		Verbose:      cfg.Verbose,
-		Auth:         cfg.Auth,
-		URL:          cfg.URL,
-	}, nil
-}
-
-func NewOpenAIAgent(cfg *AgentConfig) (*agent.Agent[model.OpenAiModel], error) {
-	if cfg == nil {
-		return nil, fmt.Errorf("nil agent config not allowed - %w", ErrAgentOptInvalid)
-	}
-
-	if cfg.URL == "" {
-		cfg.URL = "https://api.openai.com/v1/responses"
-	}
-
-	return &agent.Agent[model.OpenAiModel]{
+	return &agent.Agent[model.AIModel]{
 		Client:       cfg.Client,
 		Functions:    []executable.Executable[any, any]{},
 		Model:        cfg.Model,
@@ -71,10 +56,10 @@ func NewOpenAIAgent(cfg *AgentConfig) (*agent.Agent[model.OpenAiModel], error) {
 }
 
 func ExtendAgent[T any, S any](
-	a *agent.Agent[model.OpenAiModel],
+	a *agent.Agent[model.AIModel],
 	fnName string,
 	fn func(ctx context.Context, in T) (S, error),
-) (*agent.Agent[model.OpenAiModel], error) {
+) (*agent.Agent[model.AIModel], error) {
 	if len(a.Functions) >= model.MAX_TOOLS_COUMT {
 		return a, ErrExceededMaxToolCount
 	}

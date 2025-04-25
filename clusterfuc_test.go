@@ -14,29 +14,22 @@ import (
 )
 
 func TestAgentCreation(t *testing.T) {
-	// TODO creating agents through
-	// the restricted api of clusterfuc.
-
 	t.Run("nil agent config fails", func(t *testing.T) {
-		_, err := NewGeminiAgent(nil)
+		_, err := NewAgent(nil)
 		if err == nil {
 			t.Errorf("expected err during openai creation but got nil")
 		}
 
-		_, err = NewOpenAIAgent(nil)
+		_, err = NewAgent(nil)
 		if err == nil {
 			t.Errorf("expected err during openai creation but got nil")
 		}
 	})
 
-	t.Run("gemini agent config", func(t *testing.T) {
-		agent, err := NewGeminiAgent(&AgentConfig{})
+	t.Run("agent config", func(t *testing.T) {
+		agent, err := NewAgent(&AgentConfig{})
 		if err != nil {
 			t.Fatalf("did not expect err but got %v", err)
-		}
-
-		if agent.URL == "" {
-			t.Errorf("url is not changed from zero value")
 		}
 
 		_, ok := agent.Memoriser.(*memoriser.NoOpMemoriser)
@@ -45,19 +38,25 @@ func TestAgentCreation(t *testing.T) {
 		}
 	})
 
-	t.Run("openai agent config", func(t *testing.T) {
-		agent, err := NewOpenAIAgent(&AgentConfig{})
+	t.Run("openai agent base url", func(t *testing.T) {
+		agent, err := NewAgent(&AgentConfig{Model: OpenAIChatGPT4o})
 		if err != nil {
 			t.Fatalf("did not expect err but got %v", err)
 		}
 
-		if agent.URL == "" {
-			t.Fatalf("url is not changed from zero value")
+		if agent.URL != "https://api.openai.com/v1/responses" {
+			t.Fatalf("default url for openai is incorrect")
+		}
+	})
+
+	t.Run("gemini agent base url", func(t *testing.T) {
+		agent, err := NewAgent(&AgentConfig{Model: Gemini2Flash})
+		if err != nil {
+			t.Fatalf("did not expect err but got %v", err)
 		}
 
-		_, ok := agent.Memoriser.(*memoriser.NoOpMemoriser)
-		if !ok {
-			t.Errorf("expected NoOpMemoriser but got %#v instead", agent.Memoriser)
+		if agent.URL != "https://generativelanguage.googleapis.com/v1beta/models" {
+			t.Fatalf("default url for openai is incorrect")
 		}
 	})
 }
@@ -96,7 +95,7 @@ func TestFreely(t *testing.T) {
 		return in, nil
 	}
 
-	a, err := NewGeminiAgent(&AgentConfig{
+	a, err := NewAgent(&AgentConfig{
 		Model:   Gemini2Flash,
 		Verbose: true,
 		Client:  http.DefaultClient,
