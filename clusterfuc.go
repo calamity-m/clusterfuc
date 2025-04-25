@@ -55,7 +55,7 @@ func NewAgent(cfg *AgentConfig) (*agent.Agent[model.AIModel], error) {
 	}, nil
 }
 
-func ExtendAgent[T any, S any](
+func RegisterTool[T any, S any](
 	a *agent.Agent[model.AIModel],
 	fnName string,
 	fn func(ctx context.Context, in T) (S, error),
