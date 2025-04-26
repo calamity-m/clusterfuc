@@ -87,8 +87,12 @@ func (a *Agent[T]) callGeminiSchema(ctx context.Context, id string, userInput st
 	body.Contents = contents
 
 	// Make the request
+
+	// TODO this url with the auth is based on gemini examples, but should test supplying
+	// the token as an authorization bearer not putting it in the fucking url
+	// why would google want that anyway?
 	url := fmt.Sprintf("%s/%s:generateContent?key=%s", a.URL, a.Model.Model(), a.Auth)
-	resp, err := gemini.CallGeminiApi(ctx, a.Client, url, body)
+	resp, err := gemini.GenerateContent(ctx, a.Client, url, body)
 	if err != nil {
 		return "", fmt.Errorf("failed to call gemini api - %w", err)
 	}
@@ -129,7 +133,7 @@ func (a *Agent[T]) callGeminiSchema(ctx context.Context, id string, userInput st
 
 	// Send response back
 	body.Contents = contents
-	resp, err = gemini.CallGeminiApi(ctx, a.Client, url, body)
+	resp, err = gemini.GenerateContent(ctx, a.Client, url, body)
 	if err != nil {
 		return "", fmt.Errorf("failed second trip request to gemini api - %w", err)
 	}

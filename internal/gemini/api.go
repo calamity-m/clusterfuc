@@ -40,7 +40,7 @@ func CreateRawRequestBody(systemPrompt string, schema *executable.JSONSchemaSubs
 	return body, nil
 }
 
-func CallGeminiApi(ctx context.Context, client *http.Client, url string, body *RequestBody) (ResponseBody, error) {
+func GenerateContent(ctx context.Context, client *http.Client, url string, body *RequestBody) (ResponseBody, error) {
 
 	data, err := json.Marshal(body)
 	if err != nil {
