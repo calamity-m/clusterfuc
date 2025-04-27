@@ -40,18 +40,18 @@ type AgentInput struct {
 
 func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (string, error) {
 	if _, ok := a.Model.(model.GeminiAiModel); ok {
-		return a.callGeminiSchema(ctx, input.Id, input.UserInput, input.Schema)
+		return a.callGemini(ctx, input.Id, input.UserInput, input.Schema)
 	}
 
 	if _, ok := a.Model.(model.OpenAiModel); ok {
-		return a.callOpenAISchema(ctx, input.Id, input.UserInput, input.Schema)
+		return a.callOpenAI(ctx, input.Id, input.UserInput, input.Schema)
 	}
 
 	return "", ErrModelUnmatched
 
 }
 
-func (a *Agent[T]) callGeminiSchema(ctx context.Context, id string, userInput string, schema *executable.JSONSchemaSubset) (string, error) {
+func (a *Agent[T]) callGemini(ctx context.Context, id string, userInput string, schema *executable.JSONSchemaSubset) (string, error) {
 
 	// Create our base body
 	body, err := gemini.CreateRawRequestBody(a.SystemPrompt, schema, a.Functions)
@@ -168,6 +168,6 @@ func (a *Agent[T]) callGeminiSchema(ctx context.Context, id string, userInput st
 	return out, nil
 }
 
-func (a *Agent[T]) callOpenAISchema(ctx context.Context, id string, userInput string, schema *executable.JSONSchemaSubset) (string, error) {
+func (a *Agent[T]) callOpenAI(ctx context.Context, id string, userInput string, schema *executable.JSONSchemaSubset) (string, error) {
 	return "", nil
 }
