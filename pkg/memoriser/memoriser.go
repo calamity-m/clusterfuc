@@ -4,17 +4,17 @@ package memoriser
 // that people really might want to forcefully change
 // themselves
 type Memoriser interface {
-	Save(string, []any) bool
-	Retrieve(string) ([]any, error)
+	Save(string, []string) bool
+	Retrieve(string) ([]string, error)
 }
 
 type NoOpMemoriser struct {
 }
 
-func (no *NoOpMemoriser) Save(string, []any) bool {
+func (no *NoOpMemoriser) Save(string, []string) bool {
 	return true
 }
 
-func (no *NoOpMemoriser) Retrieve(string) ([]any, error) {
-	return []any{}, nil
+func (no *NoOpMemoriser) Retrieve(string) ([]string, error) {
+	return make([]string, 0), nil
 }

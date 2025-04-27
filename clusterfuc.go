@@ -57,13 +57,13 @@ func NewAgent(cfg *AgentConfig) (*agent.Agent[model.AIModel], error) {
 
 func RegisterTool[T any, S any](
 	a *agent.Agent[model.AIModel],
-	fnName string,
-	fn func(ctx context.Context, in T) (S, error),
+	name string,
+	tool func(ctx context.Context, in T) (S, error),
 ) (*agent.Agent[model.AIModel], error) {
 	if len(a.Functions) >= model.MAX_TOOLS_COUMT {
 		return a, ErrExceededMaxToolCount
 	}
 
-	a.Functions = append(a.Functions, executable.ExecuteableFunction(fnName, fn))
+	a.Functions = append(a.Functions, executable.ExecuteableFunction(name, tool))
 	return a, nil
 }

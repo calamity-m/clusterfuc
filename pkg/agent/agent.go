@@ -12,6 +12,7 @@ import (
 	"github.com/calamity-m/clusterfuc/pkg/gemini"
 	"github.com/calamity-m/clusterfuc/pkg/memoriser"
 	"github.com/calamity-m/clusterfuc/pkg/model"
+	"github.com/calamity-m/clusterfuc/pkg/tool"
 )
 
 var (
@@ -20,7 +21,15 @@ var (
 
 // T model type, drives what agent this will be
 type Agent[T model.AIModel] struct {
-	Functions    []executable.Executable[any, any]
+	// TODO - change to tools, not Functions
+	Functions []executable.Executable[any, any]
+	// An internal list of tools. These tools must be abstracted
+	// in terms of input/output. It is assumed that an agent
+	// will serialize to and from json for tool call operations.
+	//
+	// The tool package provides a helper wrapper for turning any
+	// function into this style
+	tools        []tool.Tool[json.RawMessage, json.RawMessage]
 	Memoriser    memoriser.Memoriser
 	Client       *http.Client
 	SystemPrompt string
@@ -51,6 +60,36 @@ func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (string, error) {
 
 }
 
+func (a *Agent[T]) call(ctx context.Context, input AgentInput) (string, error) {
+
+	// Fetch our history
+	history, err := a.Memoriser.Retrieve(input.Id)
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve history - %w", err)
+	}
+	history = append(history, input.UserInput)
+
+	output := ""
+
+	// body := make([]byte, 0)
+
+	if _, ok := a.Model.(model.GeminiAiModel); ok {
+		// body = gemini.Body(prompt, history, Schema)
+		// output = gemini.Generate(ctx, body, client)
+		// ^- output should be the final string. the
+		// Generate method should take care of evertying
+		// complex in that package, fuck it off from
+		// this place
+	}
+
+	if _, ok := a.Model.(model.OpenAiModel); ok {
+		// body = openai.Body(prompt, history, Schema)
+		// output = openai.Generate(ctx, body, client)
+	}
+
+	return output, nil
+}
+
 func (a *Agent[T]) callGemini(ctx context.Context, id string, userInput string, schema *executable.JSONSchemaSubset) (string, error) {
 
 	// Create our base body
@@ -59,19 +98,9 @@ func (a *Agent[T]) callGemini(ctx context.Context, id string, userInput string, 
 		return "", fmt.Errorf("failed to create raw request body - %w", err)
 	}
 
-	// Fetch our history
-	var history []any
-	if a.Memoriser != nil {
-		history, err = a.Memoriser.Retrieve(id)
-		if err != nil {
-			return "", fmt.Errorf("failed to retrieve history - %w", err)
-		}
-	} else {
-		history = []any{}
-	}
-
 	// Turn history into a content slice and append our user input
-	contents, err := gemini.VerifyContents(history)
+	// atm we don't use history :')
+	contents, err := gemini.VerifyContents([]any{})
 	if err != nil {
 		return "", fmt.Errorf("failed turning history into gemini contents - %w", err)
 	}
@@ -151,7 +180,7 @@ func (a *Agent[T]) callGemini(ctx context.Context, id string, userInput string, 
 		s[i] = v
 	}
 	if a.Memoriser != nil {
-		a.Memoriser.Save(id, s)
+		// TODO a.Memoriser.Save(id, s)
 	}
 
 	// Get final response
@@ -170,4 +199,12 @@ func (a *Agent[T]) callGemini(ctx context.Context, id string, userInput string, 
 
 func (a *Agent[T]) callOpenAI(ctx context.Context, id string, userInput string, schema *executable.JSONSchemaSubset) (string, error) {
 	return "", nil
+}
+
+func NewAgent(m model.AIModel) (*Agent[model.AIModel], error) {
+	agent := &Agent[model.AIModel]{
+		Model: m,
+		tools: make([]tool.Tool[json.RawMessage, json.RawMessage], 0),
+	}
+	return agent, nil
 }

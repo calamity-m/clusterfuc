@@ -28,10 +28,7 @@ func (h ExecuteFunc[T, S]) Execute(ctx context.Context, in T) (S, error) {
 	return h(ctx, in)
 }
 
-func ExecuteableFunction[T any, S any](
-	name string,
-	fn func(ctx context.Context, in T) (S, error),
-) Executable[any, any] {
+func ExecuteableFunction[T any, S any](name string, fn func(ctx context.Context, in T) (S, error)) Executable[any, any] {
 	// Might be worth removing dependency on this,
 	// famous last words but inferring a schema
 	// should be easy enough as we really just want
