@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/calamity-m/clusterfuc/internal/agent"
-	"github.com/calamity-m/clusterfuc/internal/executable"
-	"github.com/calamity-m/clusterfuc/internal/model"
+	"github.com/calamity-m/clusterfuc/pkg/agent"
+	"github.com/calamity-m/clusterfuc/pkg/executable"
 	"github.com/calamity-m/clusterfuc/pkg/memoriser"
+	"github.com/calamity-m/clusterfuc/pkg/model"
 )
 
 const (

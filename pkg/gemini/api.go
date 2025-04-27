@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/calamity-m/clusterfuc/internal/executable"
+	"github.com/calamity-m/clusterfuc/pkg/executable"
 )
 
 // CreateRawRequestBody constructs the request body for the Gemini API. Raw is considered

@@ -8,10 +8,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/calamity-m/clusterfuc/internal/executable"
-	"github.com/calamity-m/clusterfuc/internal/gemini"
-	"github.com/calamity-m/clusterfuc/internal/model"
+	"github.com/calamity-m/clusterfuc/pkg/executable"
+	"github.com/calamity-m/clusterfuc/pkg/gemini"
 	"github.com/calamity-m/clusterfuc/pkg/memoriser"
+	"github.com/calamity-m/clusterfuc/pkg/model"
 )
 
 var (

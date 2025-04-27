@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/calamity-m/clusterfuc/internal/agent"
-	"github.com/calamity-m/clusterfuc/internal/executable"
+	"github.com/calamity-m/clusterfuc/pkg/agent"
+	"github.com/calamity-m/clusterfuc/pkg/executable"
 	"github.com/calamity-m/clusterfuc/pkg/memoriser"
 )
 

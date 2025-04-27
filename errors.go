@@ -3,8 +3,8 @@ package clusterfuc
 import (
 	"errors"
 
-	"github.com/calamity-m/clusterfuc/internal/agent"
-	"github.com/calamity-m/clusterfuc/internal/gemini"
+	"github.com/calamity-m/clusterfuc/pkg/agent"
+	"github.com/calamity-m/clusterfuc/pkg/gemini"
 )
 
 var (
