@@ -83,6 +83,51 @@ func TestAgentVerbosity(t *testing.T) {
 	// not wanted may be catastrophic.
 }
 
+func TestOpenAI(t *testing.T) {
+	type Arg struct {
+		Name string `json:"name" jsonschema:"description=test name"`
+		Ok   bool   `json:"ok" jsonschema:"description=test ok"`
+	}
+
+	fn := func(ctx context.Context, in Arg) (Arg, error) {
+		fmt.Printf("yahoooo %s\n", in.Name)
+		in.Name = fmt.Sprintf("%s + %s", in.Name, "TEST EXECUTED")
+		return in, nil
+	}
+
+	a, err := NewAgent(&AgentConfig{
+		Model:   OpenAIChatGPT4oMini,
+		Verbose: true,
+		Client:  http.DefaultClient,
+		Auth:    os.Getenv("AUTH"),
+	})
+	if err != nil {
+		t.Fatalf("unexpected err - %#v", err)
+	}
+
+	err = RegisterTool(a, "test", fn)
+	if err != nil {
+		t.Fatalf("why fail - %s", err)
+	}
+
+	a.Functions = append(a.Functions, executable.ExecuteableFunction("test", fn))
+
+	input := agent.AgentInput{
+		Id: rand.Text(),
+		UserInput: fmt.Sprintf(
+			"req id: %s - input: %s",
+			rand.Text(),
+			"Please call the test function, and also tell me a random joke.",
+		),
+		Schema: nil,
+	}
+
+	o, err := a.CallV2(context.TODO(), input)
+
+	fmt.Println(err)
+	fmt.Println(o)
+}
+
 func TestFreely(t *testing.T) {
 	type Arg struct {
 		Name string `json:"name" jsonschema:"description=this is aname"`

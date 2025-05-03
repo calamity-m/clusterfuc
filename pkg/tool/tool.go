@@ -26,8 +26,8 @@ func (h executableFunc[T, S]) Execute(ctx context.Context, in T) (S, error) {
 // Relevant subset of the json schema that providers care about for
 // registering function-like tools
 type JSONSchemaSubset struct {
-	Properties any
-	Required   []string
+	Properties any      `json:"properties,omitempty"`
+	Required   []string `json:"required,omitempty"`
 }
 
 // A tool is a wrapper around some executable that a function can
@@ -63,6 +63,22 @@ func CreateTool[T any, S any](name string, fn func(ctx context.Context, in T) (S
 	return Tool[any, any]{
 		Name: name,
 		Executable: executableFunc[any, any](func(ctx context.Context, in any) (any, error) {
+			// If our input is a string encoded json blob, we'll have to handle it
+			// slightly differently
+			if inStr, ok := in.(string); ok {
+				var arg T
+				err := json.Unmarshal([]byte(inStr), &arg)
+				if err != nil {
+					return nil, err
+				}
+				o, err := fn(ctx, arg)
+				if err != nil {
+					return nil, err
+				}
+
+				return o, nil
+			}
+
 			j, err := json.Marshal(in)
 			if err != nil {
 				return nil, err

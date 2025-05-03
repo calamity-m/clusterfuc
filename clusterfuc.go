@@ -9,6 +9,7 @@ import (
 	"github.com/calamity-m/clusterfuc/pkg/executable"
 	"github.com/calamity-m/clusterfuc/pkg/memoriser"
 	"github.com/calamity-m/clusterfuc/pkg/model"
+	"github.com/calamity-m/clusterfuc/pkg/tool"
 )
 
 const (
@@ -58,12 +59,25 @@ func NewAgent(cfg *AgentConfig) (*agent.Agent[model.AIModel], error) {
 func RegisterTool[T any, S any](
 	a *agent.Agent[model.AIModel],
 	name string,
-	tool func(ctx context.Context, in T) (S, error),
-) (*agent.Agent[model.AIModel], error) {
+	t func(ctx context.Context, in T) (S, error),
+) error {
 	if len(a.Functions) >= model.MAX_TOOLS_COUMT {
-		return a, ErrExceededMaxToolCount
+		return ErrExceededMaxToolCount
+	}
+
+	a.AddTool(tool.CreateTool(name, t))
+	return nil
+}
+
+func RegisterFunction[T any, S any](
+	a *agent.Agent[model.AIModel],
+	name string,
+	tool func(ctx context.Context, in T) (S, error),
+) error {
+	if len(a.Functions) >= model.MAX_TOOLS_COUMT {
+		return ErrExceededMaxToolCount
 	}
 
 	a.Functions = append(a.Functions, executable.ExecuteableFunction(name, tool))
-	return a, nil
+	return nil
 }

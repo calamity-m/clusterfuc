@@ -12,11 +12,15 @@ import (
 	"github.com/calamity-m/clusterfuc/pkg/gemini"
 	"github.com/calamity-m/clusterfuc/pkg/memoriser"
 	"github.com/calamity-m/clusterfuc/pkg/model"
+	"github.com/calamity-m/clusterfuc/pkg/openai"
 	"github.com/calamity-m/clusterfuc/pkg/tool"
 )
 
 var (
-	ErrModelUnmatched = errors.New("model could not be matched")
+	ErrModelUnmatched   = errors.New("model could not be matched")
+	ErrInvalidId        = errors.New("invalid id")
+	ErrInvalidUserInput = errors.New("invalid user input")
+	ErrNilMemoriser     = errors.New("nil memoriser")
 )
 
 // T model type, drives what agent this will be
@@ -29,7 +33,7 @@ type Agent[T model.AIModel] struct {
 	//
 	// The tool package provides a helper wrapper for turning any
 	// function into this style
-	tools        []tool.Tool[json.RawMessage, json.RawMessage]
+	tools        []tool.Tool[any, any]
 	Memoriser    memoriser.Memoriser
 	Client       *http.Client
 	SystemPrompt string
@@ -42,32 +46,48 @@ type Agent[T model.AIModel] struct {
 }
 
 type AgentInput struct {
-	Id        string
+	// An agent call should have some ID associated with it.
+	// This may be a session ID, a user ID, or some kind of ID
+	// related to the input.
+	Id string
+	// The latest user input. History of input should be maintained
+	// via a Memoriser, rather than being passed every input
+	// call.
 	UserInput string
-	Schema    *executable.JSONSchemaSubset
+	Schema    json.RawMessage
 }
 
 func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (string, error) {
 	if _, ok := a.Model.(model.GeminiAiModel); ok {
-		return a.callGemini(ctx, input.Id, input.UserInput, input.Schema)
+		return a.callGemini(ctx, input.Id, input.UserInput, nil)
 	}
 
 	if _, ok := a.Model.(model.OpenAiModel); ok {
-		return a.callOpenAI(ctx, input.Id, input.UserInput, input.Schema)
+		return a.callOpenAI(ctx, input.Id, input.UserInput, nil)
 	}
 
 	return "", ErrModelUnmatched
 
 }
 
-func (a *Agent[T]) call(ctx context.Context, input AgentInput) (string, error) {
+func (a *Agent[T]) CallV2(ctx context.Context, input AgentInput) (string, error) {
+	if a.Memoriser == nil {
+		return "", fmt.Errorf("use NoOpMemoriser if no memory is wanted - %w", ErrNilMemoriser)
+	}
+
+	if input.Id == "" {
+		return "", fmt.Errorf("empty id encountered - %w", ErrInvalidId)
+	}
+
+	if input.UserInput == "" {
+		return "", fmt.Errorf("empty user input encountered - %w", ErrInvalidUserInput)
+	}
 
 	// Fetch our history
-	history, err := a.Memoriser.Retrieve(input.Id)
+	state, err := a.Memoriser.Retrieve(input.Id)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve history - %w", err)
 	}
-	history = append(history, input.UserInput)
 
 	output := ""
 
@@ -80,11 +100,34 @@ func (a *Agent[T]) call(ctx context.Context, input AgentInput) (string, error) {
 		// Generate method should take care of evertying
 		// complex in that package, fuck it off from
 		// this place
+		return "", errors.ErrUnsupported
 	}
 
 	if _, ok := a.Model.(model.OpenAiModel); ok {
-		// body = openai.Body(prompt, history, Schema)
-		// output = openai.Generate(ctx, body, client)
+		oa, err := openai.NewOpenAIClient(a.Client, a.Auth)
+		if err != nil {
+			return "", err
+		}
+
+		body, err := oa.Body(a.Model.Model(), input.UserInput, a.SystemPrompt, state, input.Schema)
+		if err != nil {
+			return "", err
+		}
+
+		body, output, err = oa.Generate(ctx, body, a.tools)
+		if err != nil {
+			return output, err
+		}
+
+		// Update state
+		state, err = json.Marshal(body)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to parse body into state", slog.Any("error", err), slog.Any("body", body))
+		} else {
+			if ok := a.Memoriser.Save(input.Id, state); !ok {
+				slog.ErrorContext(ctx, "failed to save updated state", slog.Any("error", err))
+			}
+		}
 	}
 
 	return output, nil
@@ -201,10 +244,14 @@ func (a *Agent[T]) callOpenAI(ctx context.Context, id string, userInput string, 
 	return "", nil
 }
 
+func (a *Agent[T]) AddTool(tool tool.Tool[any, any]) {
+	a.tools = append(a.tools, tool)
+}
+
 func NewAgent(m model.AIModel) (*Agent[model.AIModel], error) {
 	agent := &Agent[model.AIModel]{
 		Model: m,
-		tools: make([]tool.Tool[json.RawMessage, json.RawMessage], 0),
+		tools: make([]tool.Tool[any, any], 0),
 	}
 	return agent, nil
 }
