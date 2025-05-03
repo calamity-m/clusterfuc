@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/calamity-m/clusterfuc/pkg/agent"
-	"github.com/calamity-m/clusterfuc/pkg/executable"
 	"github.com/calamity-m/clusterfuc/pkg/memoriser"
 	"github.com/calamity-m/clusterfuc/pkg/model"
 	"github.com/calamity-m/clusterfuc/pkg/tool"
@@ -34,25 +33,13 @@ func NewAgent(cfg *AgentConfig) (*agent.Agent[model.AIModel], error) {
 		return nil, fmt.Errorf("nil agent config not allowed - %w", ErrAgentOptInvalid)
 	}
 
-	// Set the default URL based on the model we've supplied
-	if cfg.URL == "" {
-		if _, ok := cfg.Model.(model.GeminiAiModel); ok {
-			cfg.URL = "https://generativelanguage.googleapis.com/v1beta/models"
-		}
-		if _, ok := cfg.Model.(model.OpenAiModel); ok {
-			cfg.URL = "https://api.openai.com/v1/responses"
-		}
-	}
-
 	return &agent.Agent[model.AIModel]{
 		Client:       cfg.Client,
-		Functions:    []executable.Executable[any, any]{},
 		Model:        cfg.Model,
 		Memoriser:    &memoriser.NoOpMemoriser{},
 		SystemPrompt: cfg.SystemPrompt,
 		Verbose:      cfg.Verbose,
 		Auth:         cfg.Auth,
-		URL:          cfg.URL,
 	}, nil
 }
 
@@ -61,23 +48,7 @@ func RegisterTool[T any, S any](
 	name string,
 	t func(ctx context.Context, in T) (S, error),
 ) error {
-	if len(a.Functions) >= model.MAX_TOOLS_COUMT {
-		return ErrExceededMaxToolCount
-	}
 
 	a.AddTool(tool.CreateTool(name, t))
-	return nil
-}
-
-func RegisterFunction[T any, S any](
-	a *agent.Agent[model.AIModel],
-	name string,
-	tool func(ctx context.Context, in T) (S, error),
-) error {
-	if len(a.Functions) >= model.MAX_TOOLS_COUMT {
-		return ErrExceededMaxToolCount
-	}
-
-	a.Functions = append(a.Functions, executable.ExecuteableFunction(name, tool))
 	return nil
 }

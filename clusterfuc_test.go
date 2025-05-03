@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/calamity-m/clusterfuc/pkg/agent"
-	"github.com/calamity-m/clusterfuc/pkg/executable"
 	"github.com/calamity-m/clusterfuc/pkg/memoriser"
 )
 
@@ -35,28 +34,6 @@ func TestAgentCreation(t *testing.T) {
 		_, ok := agent.Memoriser.(*memoriser.NoOpMemoriser)
 		if !ok {
 			t.Errorf("expected NoOpMemoriser but got %#v instead", agent.Memoriser)
-		}
-	})
-
-	t.Run("openai agent base url", func(t *testing.T) {
-		agent, err := NewAgent(&AgentConfig{Model: OpenAIChatGPT4o})
-		if err != nil {
-			t.Fatalf("did not expect err but got %v", err)
-		}
-
-		if agent.URL != "https://api.openai.com/v1/responses" {
-			t.Fatalf("default url for openai is incorrect")
-		}
-	})
-
-	t.Run("gemini agent base url", func(t *testing.T) {
-		agent, err := NewAgent(&AgentConfig{Model: Gemini2Flash})
-		if err != nil {
-			t.Fatalf("did not expect err but got %v", err)
-		}
-
-		if agent.URL != "https://generativelanguage.googleapis.com/v1beta/models" {
-			t.Fatalf("default url for openai is incorrect")
 		}
 	})
 }
@@ -110,8 +87,6 @@ func TestOpenAI(t *testing.T) {
 		t.Fatalf("why fail - %s", err)
 	}
 
-	a.Functions = append(a.Functions, executable.ExecuteableFunction("test", fn))
-
 	input := agent.AgentInput{
 		Id: rand.Text(),
 		UserInput: fmt.Sprintf(
@@ -122,7 +97,7 @@ func TestOpenAI(t *testing.T) {
 		Schema: nil,
 	}
 
-	o, err := a.CallV2(context.TODO(), input)
+	o, err := a.Call(context.TODO(), input)
 
 	fmt.Println(err)
 	fmt.Println(o)
@@ -144,13 +119,16 @@ func TestFreely(t *testing.T) {
 		Model:   Gemini2Flash,
 		Verbose: true,
 		Client:  http.DefaultClient,
-		Auth:    os.Getenv("AUTH"),
+		Auth:    os.Getenv("GEMINI_AUTH"),
 	})
 	if err != nil {
 		t.Fatalf("unexpected err - %#v", err)
 	}
 
-	a.Functions = append(a.Functions, executable.ExecuteableFunction("test", fn))
+	err = RegisterTool(a, "test", fn)
+	if err != nil {
+		t.Fatalf("why fail - %s", err)
+	}
 
 	input := agent.AgentInput{
 		Id: rand.Text(),

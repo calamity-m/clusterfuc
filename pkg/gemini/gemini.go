@@ -1,6 +1,17 @@
 package gemini
 
-import "errors"
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+
+	"github.com/calamity-m/clusterfuc/pkg/tool"
+)
 
 var (
 	ErrInvalidGeminiContent = errors.New("input contains non gemini content")
@@ -130,4 +141,209 @@ type SafetyRating struct {
 	Category    string  `json:"category,omitzero,omitempty"`
 	Probability float64 `json:"probability,omitzero,omitempty"`
 	Blocked     bool    `json:"blocked,omitzero,omitempty"`
+}
+
+type Gemini struct {
+	client *http.Client
+	auth   string
+	model  string
+}
+
+func (oa *Gemini) Body(userInput string, prompt string, history json.RawMessage, schema json.RawMessage) (*RequestBody, error) {
+	// Validate user input
+	if userInput == "" {
+		return nil, errors.New("empty user input is weird")
+	}
+
+	// Form body from history
+	var body RequestBody
+	if len(history) > 0 {
+		err := json.Unmarshal(history, &body)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// System prompt
+	body.SystemInstruction.Text = prompt
+
+	// User input
+	body.Contents = append(body.Contents, Content{
+		Role: "user",
+		Parts: []Part{{
+			Text: userInput,
+		}},
+	})
+
+	// Schema
+	if len(schema) > 0 {
+		var jsonSchema tool.JSONSchemaSubset
+		err := json.Unmarshal(schema, &jsonSchema)
+		if err != nil {
+			return nil, fmt.Errorf("invalid schema supplied, could not decode it - %w", err)
+		}
+
+		body.GenerationConfig.ResponseSchema.Properties = jsonSchema.Properties
+		body.GenerationConfig.ResponseSchema.Required = jsonSchema.Required
+	}
+
+	return &body, nil
+}
+
+func (oa *Gemini) Generate(ctx context.Context, body *RequestBody, tools []tool.Tool[any, any]) (*RequestBody, string, error) {
+	if body == nil {
+		return nil, "", errors.New("nil body")
+	}
+
+	// Set our tools on our body
+	if len(body.Tools) == 0 {
+		functionDecs := make([]FunctionDeclaration, len(tools))
+		for i, tool := range tools {
+			functionDecs[i] = FunctionDeclaration{
+				Name:        tool.Name,
+				Description: tool.Name,
+				Parameters: map[string]any{
+					"type":       "object",
+					"properties": tool.Definition.Properties,
+					"required":   tool.Definition.Required,
+				},
+			}
+		}
+		body.Tools = []Tool{{FunctionDeclarations: functionDecs}}
+	}
+
+	// In case we are returning, we need to record
+	// our potential replies
+	reply := ""
+
+	// We might have function calls that require a resend
+	calls := false
+
+	// We might be calling a few times depending on the model, so
+	// if we have a ctx done before we send a response we should
+	// exit
+	select {
+	case <-ctx.Done():
+		return nil, "", ctx.Err()
+	default:
+		fmt.Println(body)
+
+		// Send body and get resp
+		resp, err := oa.generateContent(ctx, *body)
+		if err != nil {
+			return nil, "", err
+		}
+
+		if resp.Candidates == nil {
+			return nil, "", errors.New("invalid output")
+		}
+
+		for _, candidate := range resp.Candidates {
+			// Ensure our body retains this candidate for our history
+			body.Contents = append(body.Contents, candidate.Content)
+
+			for _, part := range candidate.Content.Parts {
+				if part.FunctionCall.Name == "" {
+					// We are on a message, rather than a function
+					// call
+					reply += part.Text
+				} else {
+					// Flip our tool call switch
+					calls = true
+
+					for _, tool := range tools {
+						if tool.Name == part.FunctionCall.Name {
+							out, err := tool.Executable.Execute(ctx, part.FunctionCall.Args)
+							if err != nil {
+								slog.ErrorContext(ctx, "failed to execute tool", slog.Any("tool", part.FunctionCall))
+
+								// Add failed execution to the history
+								body.Contents = append(body.Contents, Content{
+									Role: "user",
+									Parts: []Part{{
+										FunctionResponse: FunctionResponse{
+											Name: part.FunctionCall.Name,
+											Response: map[string]any{
+												"success":       false,
+												"failureReason": err.Error(),
+											},
+										},
+									}},
+								})
+							}
+
+							// Add execution to the history
+							body.Contents = append(body.Contents, Content{
+								Role: "user",
+								Parts: []Part{{
+									FunctionResponse: FunctionResponse{
+										Name:     part.FunctionCall.Name,
+										Response: out,
+									},
+								}},
+							})
+
+						}
+					}
+				}
+
+			}
+		}
+
+		if calls {
+			return oa.Generate(ctx, body, tools)
+		}
+
+	}
+
+	// if we've ended up here we have succeded
+	return body, reply, nil
+}
+
+// createResponse sends a POST request to the OpenAI /v1/responses endpoint and parses the response
+func (oa *Gemini) generateContent(ctx context.Context, body RequestBody) (*ResponseBody, error) {
+	data, err := json.Marshal(body)
+	if err != nil {
+		return &ResponseBody{}, err
+	}
+
+	url := fmt.Sprintf("%s/%s:generateContent?key=%s", "https://generativelanguage.googleapis.com/v1beta/models", oa.model, oa.auth)
+	r, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
+	if err != nil {
+		return &ResponseBody{}, err
+	}
+	r.Header.Set("Content-Type", "application/json")
+
+	resp, err := oa.client.Do(r)
+	if err != nil {
+		return &ResponseBody{}, err
+	}
+
+	if resp.StatusCode != 200 {
+		failed, _ := io.ReadAll(resp.Body)
+		fmt.Println(string(failed))
+		fmt.Printf("%#v\n", resp)
+		return &ResponseBody{}, fmt.Errorf("invalid status code: %d", resp.StatusCode)
+	}
+
+	respData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return &ResponseBody{}, err
+	}
+
+	var generated ResponseBody
+	err = json.Unmarshal(respData, &generated)
+	if err != nil {
+		return &ResponseBody{}, err
+	}
+
+	return &generated, nil
+}
+
+func NewGeminiClient(client *http.Client, auth string, model string) (*Gemini, error) {
+	return &Gemini{
+		client: client,
+		auth:   auth,
+		model:  model,
+	}, nil
 }
