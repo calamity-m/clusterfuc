@@ -30,24 +30,24 @@ func (oa *OpenAI) Body(model string, userInput string, prompt string, history js
 	}
 
 	// Form body from history
-	var resp CreateResponse
+	var body CreateResponse
 	if len(history) > 0 {
-		err := json.Unmarshal(history, &resp)
+		err := json.Unmarshal(history, &body)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// Set system instructions
-	resp.Instructions = prompt
+	body.Instructions = prompt
 
 	// Set schema
 	if schema != nil {
-		resp.Text.Type = "json_schema"
-		resp.Text.Strict = true
-		resp.Text.Description = "schema for all responses to correspond to"
-		resp.Text.Name = "schema"
-		resp.Text.Schema = schema
+		body.Text.Type = "json_schema"
+		body.Text.Strict = true
+		body.Text.Description = "schema for all responses to correspond to"
+		body.Text.Name = "schema"
+		body.Text.Schema = schema
 	}
 
 	// Set user input
@@ -66,12 +66,12 @@ func (oa *OpenAI) Body(model string, userInput string, prompt string, history js
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode user input - %w", err)
 	}
-	resp.Input = append(resp.Input, i)
+	body.Input = append(body.Input, i)
 
 	// Set model
-	resp.Model = model
+	body.Model = model
 
-	return &resp, nil
+	return &body, nil
 }
 
 func (oa *OpenAI) Generate(ctx context.Context, body *CreateResponse, tools []tool.Tool[any, any]) (*CreateResponse, string, error) {
