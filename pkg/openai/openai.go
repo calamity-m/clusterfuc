@@ -174,7 +174,11 @@ func (oa *OpenAI) Generate(ctx context.Context, body *CreateResponse, tools []to
 					if tool.Name == call.Name {
 						result, err := tool.Executable.Execute(ctx, call.Arguments)
 						if err != nil {
-							return nil, reply, fmt.Errorf("encountered err while executing tool - %w", err)
+							// Tool failures might be expected, so we'll append it to input and move on
+							// rather than failing outright
+							slog.ErrorContext(ctx, "encountered err while executing tool", slog.Any("error", err))
+							body.Input = append(body.Input, json.RawMessage(err.Error()))
+							continue
 						}
 
 						str, err := json.Marshal(result)
