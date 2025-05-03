@@ -177,7 +177,15 @@ func (oa *OpenAI) Generate(ctx context.Context, body *CreateResponse, tools []to
 							// Tool failures might be expected, so we'll append it to input and move on
 							// rather than failing outright
 							slog.ErrorContext(ctx, "encountered err while executing tool", slog.Any("error", err))
-							body.Input = append(body.Input, json.RawMessage(err.Error()))
+							output, err := json.Marshal(FunctionToolCallOutput{
+								BaseItem: BaseItem{Type: "function_call_output"},
+								CallID:   call.CallID,
+								Output:   string(err.Error()),
+							})
+							if err != nil {
+								return nil, reply, fmt.Errorf("failed encoding tool call failure - %w", err)
+							}
+							body.Input = append(body.Input, output)
 							continue
 						}
 

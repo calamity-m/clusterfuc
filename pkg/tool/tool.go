@@ -65,29 +65,23 @@ func CreateTool[T any, S any](name string, fn func(ctx context.Context, in T) (S
 		Executable: executableFunc[any, any](func(ctx context.Context, in any) (any, error) {
 			// If our input is a string encoded json blob, we'll have to handle it
 			// slightly differently
+			var arg T
+
 			if inStr, ok := in.(string); ok {
-				var arg T
 				err := json.Unmarshal([]byte(inStr), &arg)
 				if err != nil {
 					return nil, err
 				}
-				o, err := fn(ctx, arg)
+			} else {
+				j, err := json.Marshal(in)
 				if err != nil {
 					return nil, err
 				}
 
-				return o, nil
-			}
-
-			j, err := json.Marshal(in)
-			if err != nil {
-				return nil, err
-			}
-
-			var arg T
-			err = json.Unmarshal(j, &arg)
-			if err != nil {
-				return nil, err
+				err = json.Unmarshal(j, &arg)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			o, err := fn(ctx, arg)
