@@ -49,8 +49,11 @@ type AgentInput struct {
 	// The latest user input. History of input should be maintained
 	// via a Memoriser, rather than being passed every input
 	// call.
-	UserInput string          `json:"user_input,omitempty" jsonschema:"description=Input of the user for agent to use,required"`
-	Schema    json.RawMessage `json:"-"`
+	UserInput string `json:"user_input,omitempty" jsonschema:"description=Input of the user for agent to use,required"`
+	// Optional schema for agent to follow. The schema should follow some json encoded message, which is dependent on
+	// the model provider being used. For example, the schema accepted by gemini may be different that the one
+	// accepted by openai.
+	Schema json.RawMessage `json:"-"`
 }
 
 type AgentOutput struct {
