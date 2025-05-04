@@ -315,8 +315,6 @@ func (oa *OpenAI) Generate(ctx context.Context, body *CreateResponse, tools []to
 	case <-ctx.Done():
 		return nil, "", ctx.Err()
 	default:
-		fmt.Println(body)
-
 		// Send body and get resp
 		resp, err := oa.createResponse(ctx, *body)
 		if err != nil {

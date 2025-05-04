@@ -45,49 +45,54 @@ type AgentInput struct {
 	// An agent call should have some ID associated with it.
 	// This may be a session ID, a user ID, or some kind of ID
 	// related to the input.
-	Id string
+	Id string `json:"id,omitempty"`
 	// The latest user input. History of input should be maintained
 	// via a Memoriser, rather than being passed every input
 	// call.
-	UserInput string
-	Schema    json.RawMessage
+	UserInput string          `json:"user_input,omitempty"`
+	Schema    json.RawMessage `json:"schema,omitempty"`
 }
 
-func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (string, error) {
+type AgentOutput struct {
+	Output string `json:"output,omitempty"`
+}
+
+func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (AgentOutput, error) {
 	if a.Memoriser == nil {
-		return "", fmt.Errorf("use NoOpMemoriser if no memory is wanted - %w", ErrNilMemoriser)
+		return AgentOutput{}, fmt.Errorf("use NoOpMemoriser if no memory is wanted - %w", ErrNilMemoriser)
 	}
 
 	if input.Id == "" {
-		return "", fmt.Errorf("empty id encountered - %w", ErrInvalidId)
+		return AgentOutput{}, fmt.Errorf("empty id encountered - %w", ErrInvalidId)
 	}
 
 	if input.UserInput == "" {
-		return "", fmt.Errorf("empty user input encountered - %w", ErrInvalidUserInput)
+		return AgentOutput{}, fmt.Errorf("empty user input encountered - %w", ErrInvalidUserInput)
 	}
 
 	// Fetch our history
 	state, err := a.Memoriser.Retrieve(input.Id)
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve history - %w", err)
+		return AgentOutput{}, fmt.Errorf("failed to retrieve history - %w", err)
 	}
 
-	output := ""
+	output := AgentOutput{}
 
 	if _, ok := a.Model.(model.GeminiAiModel); ok {
 		g, err := gemini.NewGeminiClient(a.Client, a.Auth, a.Model.Model())
 		if err != nil {
-			return "", err
+			return AgentOutput{}, err
 		}
 		body, err := g.Body(input.UserInput, a.SystemPrompt, state, input.Schema)
 		if err != nil {
-			return "", err
+			return AgentOutput{}, err
 		}
 
-		body, output, err = g.Generate(ctx, body, a.tools)
+		body, res, err := g.Generate(ctx, body, a.tools)
 		if err != nil {
-			return "", err
+			return AgentOutput{}, err
 		}
+		output.Output = res
 
 		// Update state
 		state, err = json.Marshal(body)
@@ -103,18 +108,19 @@ func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (string, error) {
 	if _, ok := a.Model.(model.OpenAiModel); ok {
 		oa, err := openai.NewOpenAIClient(a.Client, a.Auth)
 		if err != nil {
-			return "", err
+			return AgentOutput{}, err
 		}
 
 		body, err := oa.Body(a.Model.Model(), input.UserInput, a.SystemPrompt, state, input.Schema)
 		if err != nil {
-			return "", err
+			return AgentOutput{}, err
 		}
 
-		body, output, err = oa.Generate(ctx, body, a.tools)
+		body, res, err := oa.Generate(ctx, body, a.tools)
 		if err != nil {
 			return output, err
 		}
+		output.Output = res
 
 		// Update state
 		state, err = json.Marshal(body)
@@ -129,117 +135,6 @@ func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (string, error) {
 
 	return output, nil
 }
-
-// func (a *Agent[T]) callGemini(ctx context.Context, id string, userInput string, schema *executable.JSONSchemaSubset) (string, error) {
-
-// 	// Create our base body
-// 	body, err := gemini.CreateRawRequestBody(a.SystemPrompt, schema, a.tools)
-// 	if err != nil {
-// 		return "", fmt.Errorf("failed to create raw request body - %w", err)
-// 	}
-
-// 	// Turn history into a content slice and append our user input
-// 	// atm we don't use history :')
-// 	contents, err := gemini.VerifyContents([]any{})
-// 	if err != nil {
-// 		return "", fmt.Errorf("failed turning history into gemini contents - %w", err)
-// 	}
-// 	contents = append(
-// 		contents,
-// 		gemini.Content{
-// 			Role: "user",
-// 			Parts: []gemini.Part{{
-// 				Text: userInput,
-// 			}},
-// 		},
-// 	)
-// 	body.Contents = contents
-
-// 	// Make the request
-
-// 	// TODO this url with the auth is based on gemini examples, but should test supplying
-// 	// the token as an authorization bearer not putting it in the fucking url
-// 	// why would google want that anyway?
-// 	url := fmt.Sprintf("%s/%s:generateContent?key=%s", a.URL, a.Model.Model(), a.Auth)
-// 	resp, err := gemini.GenerateContent(ctx, a.Client, url, body)
-// 	if err != nil {
-// 		return "", fmt.Errorf("failed to call gemini api - %w", err)
-// 	}
-
-// 	// Check if we have any function calls
-// 	for _, candidate := range resp.Candidates {
-
-// 		for _, part := range candidate.Content.Parts {
-// 			// Add this response to our chain of contents
-
-// 			fmt.Println(part)
-// 			if part.FunctionCall.Name != "" {
-// 				contents = append(contents, gemini.Content{Role: "model", Parts: []gemini.Part{part}})
-
-// 				// We have some function call
-// 				name := part.FunctionCall.Name
-// 				for _, exec := range a.tools {
-// 					if exec.Name == name {
-// 						out, err := exec.Executable.Execute(ctx, part.FunctionCall.Args)
-// 						if err != nil {
-// 							slog.ErrorContext(
-// 								ctx,
-// 								"failed to call function",
-// 								slog.String("function", name),
-// 								slog.Any("input", part.FunctionCall.Args),
-// 							)
-// 							contents = gemini.AppendContentsFailure(contents, name, err.Error())
-// 							continue
-// 						}
-
-// 						// Append our response
-// 						contents = gemini.AppendFunctionResponse(contents, name, out)
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	// Send response back
-// 	body.Contents = contents
-// 	resp, err = gemini.GenerateContent(ctx, a.Client, url, body)
-// 	if err != nil {
-// 		return "", fmt.Errorf("failed second trip request to gemini api - %w", err)
-// 	}
-// 	if resp.Candidates == nil || resp.Candidates[0].Content.Parts == nil {
-// 		return "", fmt.Errorf("did not receive proper response - %#v", resp)
-// 	}
-
-// 	// Add response to contents and save them
-// 	contents = append(contents, resp.Candidates[0].Content)
-// 	body.Contents = contents
-
-// 	// We have finished now, so save our contents
-// 	s := make([]any, len(contents))
-// 	for i, v := range contents {
-// 		s[i] = v
-// 	}
-// 	if a.Memoriser != nil {
-// 		// TODO a.Memoriser.Save(id, s)
-// 	}
-
-// 	// Get final response
-// 	out := resp.Candidates[0].Content.Parts[0].Text
-
-// 	if a.Verbose {
-// 		if m, err := json.Marshal(body); err == nil {
-// 			fmt.Println(string(m))
-// 		}
-
-// 		slog.DebugContext(ctx, "output", slog.Any("body", body))
-// 	}
-
-// 	return out, nil
-// }
-
-// func (a *Agent[T]) callOpenAI(ctx context.Context, id string, userInput string, schema *executable.JSONSchemaSubset) (string, error) {
-// 	return "", nil
-// }
 
 func (a *Agent[T]) AddTool(tool tool.Tool[any, any]) {
 	a.tools = append(a.tools, tool)

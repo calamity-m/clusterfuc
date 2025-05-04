@@ -226,7 +226,6 @@ func (oa *Gemini) Generate(ctx context.Context, body *RequestBody, tools []tool.
 	case <-ctx.Done():
 		return nil, "", ctx.Err()
 	default:
-		fmt.Println(body)
 
 		// Send body and get resp
 		resp, err := oa.generateContent(ctx, *body)
@@ -320,9 +319,11 @@ func (oa *Gemini) generateContent(ctx context.Context, body RequestBody) (*Respo
 	}
 
 	if resp.StatusCode != 200 {
-		failed, _ := io.ReadAll(resp.Body)
-		fmt.Println(string(failed))
-		fmt.Printf("%#v\n", resp)
+		failed, err := io.ReadAll(resp.Body)
+		if err != nil {
+			slog.ErrorContext(ctx, "non 200 response parsing failed", slog.Any("error", err))
+		}
+		slog.ErrorContext(ctx, "non 200 response from gemini", slog.Any("body", failed))
 		return &ResponseBody{}, fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 

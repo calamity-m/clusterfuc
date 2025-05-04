@@ -100,7 +100,7 @@ func TestOpenAI(t *testing.T) {
 	o, err := a.Call(context.TODO(), input)
 
 	fmt.Println(err)
-	fmt.Println(o)
+	fmt.Println(o.Output)
 }
 
 func TestFreely(t *testing.T) {
@@ -143,5 +143,5 @@ func TestFreely(t *testing.T) {
 	o, err := a.Call(context.TODO(), input)
 
 	fmt.Println(err)
-	fmt.Println(o)
+	fmt.Println(o.Output)
 }
