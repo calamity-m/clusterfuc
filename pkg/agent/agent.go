@@ -45,12 +45,12 @@ type AgentInput struct {
 	// An agent call should have some ID associated with it.
 	// This may be a session ID, a user ID, or some kind of ID
 	// related to the input.
-	Id string `json:"id,omitempty"`
+	Id string `json:"id,omitempty" jsonschema:"description=ID of the user or conversation,required"`
 	// The latest user input. History of input should be maintained
 	// via a Memoriser, rather than being passed every input
 	// call.
-	UserInput string          `json:"user_input,omitempty"`
-	Schema    json.RawMessage `json:"schema,omitempty"`
+	UserInput string          `json:"user_input,omitempty" jsonschema:"description=Input of the user for agent to use,required"`
+	Schema    json.RawMessage `json:"-"`
 }
 
 type AgentOutput struct {
