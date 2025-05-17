@@ -191,6 +191,8 @@ func (oa *Gemini) Body(userInput string, prompt string, history json.RawMessage,
 }
 
 func (oa *Gemini) Generate(ctx context.Context, body *RequestBody, tools []tool.Tool[any, any]) (*RequestBody, string, error) {
+	slog.DebugContext(ctx, "gemini agent called", slog.String("model", oa.model))
+
 	if body == nil {
 		return nil, "", errors.New("nil body")
 	}

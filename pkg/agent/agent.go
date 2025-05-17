@@ -61,6 +61,11 @@ type AgentOutput struct {
 }
 
 func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (AgentOutput, error) {
+	slog.DebugContext(ctx, "received agent call request", slog.String("model", a.Model.Model()))
+	if a.Verbose {
+		slog.DebugContext(ctx, "request input", slog.Any("input", input))
+	}
+
 	if a.Memoriser == nil {
 		return AgentOutput{}, fmt.Errorf("use NoOpMemoriser if no memory is wanted - %w", ErrNilMemoriser)
 	}
@@ -74,9 +79,12 @@ func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (AgentOutput, err
 	}
 
 	// Fetch our history
-	state, err := a.Memoriser.Retrieve(input.Id)
+	history, err := a.Memoriser.Retrieve(input.Id)
 	if err != nil {
 		return AgentOutput{}, fmt.Errorf("failed to retrieve history - %w", err)
+	}
+	if a.Verbose {
+		slog.DebugContext(ctx, "found the following history", slog.Any("history", history))
 	}
 
 	output := AgentOutput{}
@@ -86,23 +94,24 @@ func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (AgentOutput, err
 		if err != nil {
 			return AgentOutput{}, err
 		}
-		body, err := g.Body(input.UserInput, a.SystemPrompt, state, input.Schema)
+		body, err := g.Body(input.UserInput, a.SystemPrompt, history, input.Schema)
 		if err != nil {
 			return AgentOutput{}, err
 		}
 
 		body, res, err := g.Generate(ctx, body, a.tools)
 		if err != nil {
+			slog.ErrorContext(ctx, "failed calling gemini model", slog.Any("err", err))
 			return AgentOutput{}, err
 		}
 		output.Output = res
 
 		// Update state
-		state, err = json.Marshal(body)
+		history, err = json.Marshal(body)
 		if err != nil {
 			slog.ErrorContext(ctx, "failed to parse gemini body into state", slog.Any("error", err), slog.Any("body", body))
 		} else {
-			if ok := a.Memoriser.Save(input.Id, state); !ok {
+			if ok := a.Memoriser.Save(input.Id, history); !ok {
 				slog.ErrorContext(ctx, "failed to save updated gemini state", slog.Any("error", err))
 			}
 		}
@@ -114,23 +123,24 @@ func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (AgentOutput, err
 			return AgentOutput{}, err
 		}
 
-		body, err := oa.Body(a.Model.Model(), input.UserInput, a.SystemPrompt, state, input.Schema)
+		body, err := oa.Body(a.Model.Model(), input.UserInput, a.SystemPrompt, history, input.Schema)
 		if err != nil {
 			return AgentOutput{}, err
 		}
 
 		body, res, err := oa.Generate(ctx, body, a.tools)
 		if err != nil {
+			slog.ErrorContext(ctx, "failed calling openai model", slog.Any("err", err))
 			return output, err
 		}
 		output.Output = res
 
 		// Update state
-		state, err = json.Marshal(body)
+		history, err = json.Marshal(body)
 		if err != nil {
 			slog.ErrorContext(ctx, "failed to parse openai body into state", slog.Any("error", err), slog.Any("body", body))
 		} else {
-			if ok := a.Memoriser.Save(input.Id, state); !ok {
+			if ok := a.Memoriser.Save(input.Id, history); !ok {
 				slog.ErrorContext(ctx, "failed to save updated openai state", slog.Any("error", err))
 			}
 		}

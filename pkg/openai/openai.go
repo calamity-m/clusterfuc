@@ -279,6 +279,8 @@ func (oa *OpenAI) Generate(ctx context.Context, body *CreateResponse, tools []to
 		return nil, "", errors.New("nil body")
 	}
 
+	slog.DebugContext(ctx, "openai agent called", slog.String("model", body.Model))
+
 	// Set our tools on our body
 	if len(body.Tools) == 0 {
 		for _, tool := range tools {
@@ -301,6 +303,8 @@ func (oa *OpenAI) Generate(ctx context.Context, body *CreateResponse, tools []to
 		}
 	}
 
+	slog.DebugContext(ctx, "openai agent tools registered", slog.Any("tools", body.Tools))
+
 	// In case we are returning, we need to record
 	// our potential replies
 	reply := ""
@@ -320,6 +324,8 @@ func (oa *OpenAI) Generate(ctx context.Context, body *CreateResponse, tools []to
 		if err != nil {
 			return nil, "", err
 		}
+
+		slog.DebugContext(ctx, "received response from openai", slog.Any("resp", resp))
 
 		if resp.Output == nil {
 			return nil, "", errors.New("invalid output")
@@ -365,6 +371,7 @@ func (oa *OpenAI) Generate(ctx context.Context, body *CreateResponse, tools []to
 				var call FunctionToolCall
 				err := json.Unmarshal(output, &call)
 				if err != nil {
+					slog.ErrorContext(ctx, "encountered err while parsing tool call", slog.Any("error", err))
 					return nil, "", fmt.Errorf("failed to decode function_call - %w", err)
 				}
 
@@ -378,7 +385,7 @@ func (oa *OpenAI) Generate(ctx context.Context, body *CreateResponse, tools []to
 							output, err := json.Marshal(FunctionToolCallOutput{
 								BaseItem: BaseItem{Type: "function_call_output"},
 								CallID:   call.CallID,
-								Output:   string(err.Error()),
+								Output:   errorResponse(err.Error()),
 							})
 							if err != nil {
 								return nil, reply, fmt.Errorf("failed encoding tool call failure - %w", err)
@@ -470,4 +477,21 @@ func NewOpenAIClient(client *http.Client, auth string) (*OpenAI, error) {
 		client: client,
 		auth:   auth,
 	}, nil
+}
+
+func errorResponse(message string) string {
+	r, err := json.Marshal(struct {
+		Success bool   `json:"success"`
+		Reason  string `json:"reason"`
+	}{
+		Success: false,
+		Reason:  message,
+	})
+
+	if err != nil {
+		slog.Error("Encountered improbable json marshling error", slog.String("err", err.Error()))
+		return message
+	}
+
+	return string(r)
 }
