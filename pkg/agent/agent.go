@@ -81,7 +81,7 @@ func (a *Agent[T]) Call(ctx context.Context, input AgentInput) (AgentOutput, err
 	// Fetch our history
 	history, err := a.Memoriser.Retrieve(input.Id)
 	if err != nil {
-		return AgentOutput{}, fmt.Errorf("failed to retrieve history - %w", err)
+		slog.InfoContext(ctx, "received request with no prior history")
 	}
 	if a.Verbose {
 		slog.DebugContext(ctx, "found the following history", slog.Any("history", history))
